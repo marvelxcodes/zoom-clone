@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Clapping hands (1F44F) - uses JoyPixels emoji sprite sheet via CSS class "joypixels-24-people" -->
+  <!-- NOTE: Zoom renders these via CSS sprite sheet: https://st1.zoom.us/fe-static/fe-emoji/0.0.1.20/sprites/joypixels-sprite-24.css -->
+  <!-- For clone purposes use the text emoji or an inline path -->
+  <text x="4" y="52" font-size="48" font-family="Apple Color Emoji, Segoe UI Emoji, sans-serif">👏</text>
+</svg>

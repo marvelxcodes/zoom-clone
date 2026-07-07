@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* rebuild-trigger */
+@theme {
+  --color-zoom-blue: #0e71eb;
+  --color-zoom-blue-dark: #0b5cba;
+  --color-zoom-blue-light: #2d8cff;
+  --color-zoom-orange: #ff742e;
+  --color-zoom-orange-dark: #e6621a;
+  --color-zoom-link: #0d6bde;
+  --color-zoom-bg: #f7f9fc;
+  --color-zoom-sidebar: #e2e6e9;
+  --color-zoom-panel: #ffffff;
+  --color-zoom-border: #c1c6ce;
+  --color-zoom-border-subtle: #e5e8ec;
+  --color-zoom-text: #131619;
+  --color-zoom-heading: #232333;
+  --color-zoom-muted: #6e7680;
+  --color-zoom-room-bg: #1c1e20;
+  --color-zoom-room-panel: #2b2d31;
+  --color-zoom-room-tile: #3a3d43;
+  --color-zoom-danger: #e02020;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Liberation Sans", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-zoom-bg);
+  color: var(--color-zoom-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.42px;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.dark-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.dark-scroll::-webkit-scrollbar-thumb {
+  background: #4a4d53;
+  border-radius: 3px;
+}
+
+@keyframes float {
+  0% {
+    transform: translate(-50%, 0) scale(0.9);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -20px) scale(1.15);
+  }
+  100% {
+    transform: translate(-50%, -260px) scale(1);
+    opacity: 0;
+  }
+}

@@ -1,0 +1,4 @@
+fastapi>=0.118.0
+sqlmodel>=0.0.24
+pydantic>=2.12.0
+python-multipart>=0.0.20

@@ -1,0 +1,71 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Bun
+.bun/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# SQLite databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Local tooling caches / scratch
+.claude/
+.tasks/
+.playwright-mcp/
+
+# Dev QA screenshots (kept locally, not versioned)
+clone-*.png
+meeting-room-*.png
+schedule-*.png
+frontend-*.png
+home-*.png
+header-*.png
+footer-*.png
+participants-*.png
+reactions-*.png
+tablet-*.png
+final-*.png
+end-meeting-*.png
+more-menu-*.png
+room-*.png
+zoom-*.png
