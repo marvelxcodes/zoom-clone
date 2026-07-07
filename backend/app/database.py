@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote
 
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -14,52 +13,46 @@ def _resolve_local_db_path() -> Path:
     return Path(__file__).resolve().parent.parent / "zoom_clone.db"
 
 
-def _turso_url() -> Optional[str]:
-    """Build the sqlalchemy-libsql URL for Turso, or None when env is unset.
-
-    The dialect (see `sqlalchemy_libsql/libsql.py`) requires three query
-    params to talk to a remote libSQL server:
-
-      * `uri=true`     — otherwise the dialect falls back to `url.database`
-                         which is empty for `sqlite+libsql://host/`, so it
-                         opens `:memory:` and ignores Turso entirely.
-      * `secure=true`  — picks the `https://` scheme when the dialect
-                         constructs the underlying network URL. Without
-                         this it uses `http://` and Turso answers with
-                         "308 Permanent Redirect, body=Redirecting".
-      * `authToken=…`  — forwarded verbatim into the network URL so
-                         libsql-experimental can authenticate.
-    """
+def _turso_config() -> Optional[tuple[str, str]]:
+    """Return (libsql_url, auth_token) when both Turso env vars are set."""
     raw = os.environ.get("TURSO_DATABASE_URL")
     token = os.environ.get("TURSO_AUTH_TOKEN")
-    if not raw:
+    if not raw or not token:
         return None
 
-    if raw.startswith("libsql://"):
-        host = raw[len("libsql://") :]
-    elif raw.startswith("https://"):
-        host = raw[len("https://") :]
-    elif raw.startswith("sqlite+libsql://"):
-        host = raw[len("sqlite+libsql://") :]
-    else:
-        host = raw
-
-    # Drop any pre-existing query string / path; we re-build them below.
-    host = host.split("/", 1)[0].split("?", 1)[0]
-
-    params = ["secure=true", "uri=true"]
-    if token:
-        # Order matters for readability only; libsql doesn't care.
-        params.insert(0, f"authToken={quote(token, safe='')}")
-    return f"sqlite+libsql://{host}/?{'&'.join(params)}"
+    # Normalise: strip a `sqlite+libsql://` prefix if the user pasted the
+    # SQLAlchemy form; keep `libsql://` / `https://` intact — both are
+    # accepted natively by libsql-experimental's `connect()`.
+    if raw.startswith("sqlite+libsql://"):
+        raw = "libsql://" + raw[len("sqlite+libsql://") :]
+    # Drop any query string; auth flows through the kwarg.
+    raw = raw.split("?", 1)[0].rstrip("/")
+    return raw, token
 
 
-_turso = _turso_url()
+_turso = _turso_config()
 
 if _turso:
-    DATABASE_URL = _turso
+    _turso_url, _turso_token = _turso
     DB_PATH: Optional[Path] = None
-    engine = create_engine(DATABASE_URL, echo=False)
+    DATABASE_URL = _turso_url
+
+    # Bypass sqlalchemy-libsql's URL munging (which rewrites the URL to
+    # `https://<host>?authToken=…`; Turso's HTTP endpoint answers that
+    # with "308 Permanent Redirect" during `PRAGMA read_uncommitted`).
+    # Instead hand SQLAlchemy a plain callable that opens a libsql
+    # connection with the token as a proper kwarg — libsql-experimental
+    # handles the `libsql://` scheme (WebSocket over TLS) directly.
+    def _make_conn():
+        import libsql_experimental as libsql
+
+        return libsql.connect(_turso_url, auth_token=_turso_token)
+
+    engine = create_engine(
+        "sqlite+libsql://",
+        creator=_make_conn,
+        echo=False,
+    )
 else:
     DB_PATH = _resolve_local_db_path()
     DATABASE_URL = f"sqlite:///{DB_PATH}"
