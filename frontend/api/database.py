@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote
 
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -17,41 +16,47 @@ def _resolve_local_db_path() -> Path:
     return Path(__file__).resolve().parent.parent / "zoom_clone.db"
 
 
-def _turso_url() -> Optional[str]:
-    """Build a SQLAlchemy URL for Turso if the required env vars are present.
+def _turso_engine_args() -> Optional[tuple[str, dict]]:
+    """Return (url, connect_args) for Turso, or None when env vars are unset.
 
-    Accepts either:
-      - `TURSO_DATABASE_URL=libsql://<db>.turso.io` + `TURSO_AUTH_TOKEN=<token>`
-      - `TURSO_DATABASE_URL` already containing `?authToken=...&secure=true`
+    The auth token goes through `connect_args` — passing it in the URL query
+    string leaves the libsql client without a JWT (SQLAlchemy consumes the
+    query params before the dialect sees them) and Turso replies 401
+    "empty JWT token".
     """
     raw = os.environ.get("TURSO_DATABASE_URL")
+    token = os.environ.get("TURSO_AUTH_TOKEN")
     if not raw:
         return None
 
-    # sqlalchemy-libsql speaks `sqlite+libsql://`, so normalise from `libsql://`.
+    # Normalise the scheme to what sqlalchemy-libsql expects.
     if raw.startswith("libsql://"):
         url = "sqlite+libsql://" + raw[len("libsql://") :]
-    elif raw.startswith(("sqlite+libsql://", "https://")):
-        url = raw.replace("https://", "sqlite+libsql://", 1) if raw.startswith("https://") else raw
+    elif raw.startswith("https://"):
+        url = "sqlite+libsql://" + raw[len("https://") :]
     else:
         url = raw
 
-    token = os.environ.get("TURSO_AUTH_TOKEN")
-    if token and "authToken=" not in url:
-        sep = "&" if "?" in url else "?"
-        url = f"{url}{sep}authToken={quote(token)}&secure=true"
-    elif "secure=" not in url:
-        sep = "&" if "?" in url else "?"
-        url = f"{url}{sep}secure=true"
-    return url
+    # Strip any pre-embedded query params (we're passing them via connect_args).
+    if "?" in url:
+        url = url.split("?", 1)[0]
+    # Canonical form has a trailing slash so the URL parser sees an empty
+    # "database" segment.
+    if not url.endswith("/"):
+        url += "/"
+
+    connect_args: dict = {"secure": True}
+    if token:
+        connect_args["auth_token"] = token
+    return url, connect_args
 
 
-_turso = _turso_url()
+_turso = _turso_engine_args()
 
 if _turso:
-    DATABASE_URL = _turso
+    DATABASE_URL, _connect_args = _turso
     DB_PATH: Optional[Path] = None
-    engine = create_engine(DATABASE_URL, echo=False)
+    engine = create_engine(DATABASE_URL, echo=False, connect_args=_connect_args)
 else:
     DB_PATH = _resolve_local_db_path()
     DATABASE_URL = f"sqlite:///{DB_PATH}"
