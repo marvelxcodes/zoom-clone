@@ -10,7 +10,7 @@ from datetime import timedelta
 
 from sqlmodel import Session, delete, select
 
-from .database import DB_PATH, engine, init_db
+from .database import DATABASE_URL, DB_PATH, engine, init_db
 from .models import Meeting, Participant, User, utcnow
 from .utils import new_meeting_id, new_passcode
 
@@ -86,7 +86,9 @@ def _populate(session: Session) -> None:
 
 
 def reset_and_seed() -> None:
-    if DB_PATH.exists():
+    # Wipe the on-disk SQLite file if we're using local storage; for Turso
+    # we can't unlink a remote DB, so fall back to truncating all rows below.
+    if DB_PATH is not None and DB_PATH.exists():
         DB_PATH.unlink()
     init_db()
     with Session(engine) as session:
@@ -95,7 +97,8 @@ def reset_and_seed() -> None:
         session.exec(delete(User))
         session.commit()
         _populate(session)
-    print(f"Seeded database at {DB_PATH}")
+    where = str(DB_PATH) if DB_PATH is not None else DATABASE_URL
+    print(f"Seeded database at {where}")
 
 
 def seed_if_empty() -> None:
