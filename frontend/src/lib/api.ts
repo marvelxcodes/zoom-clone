@@ -8,29 +8,25 @@ const API_PREFIX = "/api";
 /**
  * Resolve the base URL for API calls.
  *
- * On Vercel `NEXT_PUBLIC_API_URL` is ignored so a stray `.env.local` value
- * or dashboard env can't point the deployed client at localhost. Vercel
- * requests always stay same-origin (client) or self-referential via
- * `VERCEL_URL` (server components — Node's `fetch` needs absolute URLs).
- *
- * Locally, `NEXT_PUBLIC_API_URL` still points client + server at the
- * standalone uvicorn server (default `http://127.0.0.1:8000`).
+ * - Server-side on Vercel: `VERCEL_URL` is set by the platform, so RSC
+ *   fetches hit the same deployment's `/api/*` function via HTTPS. Node's
+ *   `fetch` refuses relative URLs, so this must be absolute.
+ * - Server-side locally: honor `NEXT_PUBLIC_API_URL` (points at uvicorn)
+ *   or fall back to `http://localhost:PORT`.
+ * - Client-side: same-origin unless `NEXT_PUBLIC_API_URL` was baked into
+ *   the build. On Vercel that env var should be *unset* so the client
+ *   uses the rewrite; locally it points at the uvicorn server.
  */
-const IS_VERCEL = !!process.env.NEXT_PUBLIC_VERCEL_ENV;
-
 function resolveBaseUrl(): string {
-  if (IS_VERCEL) {
-    if (typeof window !== "undefined") return "";
+  if (typeof window === "undefined") {
     if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-    return "";
+    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+    return `http://localhost:${process.env.PORT ?? 3000}`;
   }
-  const explicit = process.env.NEXT_PUBLIC_API_URL;
-  if (explicit) return explicit;
-  if (typeof window !== "undefined") return "";
-  return `http://localhost:${process.env.PORT ?? 3000}`;
+  return process.env.NEXT_PUBLIC_API_URL ?? "";
 }
 
-export const API_URL = IS_VERCEL ? "" : process.env.NEXT_PUBLIC_API_URL ?? "";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 async function request<T>(
   path: string,
