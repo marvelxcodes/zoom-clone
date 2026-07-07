@@ -8,17 +8,36 @@ const API_PREFIX = "/api";
 /**
  * Resolve the base URL for API calls.
  *
- * - Server-side on Vercel: `VERCEL_URL` is set by the platform, so RSC
- *   fetches hit the same deployment's `/api/*` function via HTTPS. Node's
- *   `fetch` refuses relative URLs, so this must be absolute.
- * - Server-side locally: honor `NEXT_PUBLIC_API_URL` (points at uvicorn)
- *   or fall back to `http://localhost:PORT`.
- * - Client-side: same-origin unless `NEXT_PUBLIC_API_URL` was baked into
- *   the build. On Vercel that env var should be *unset* so the client
- *   uses the rewrite; locally it points at the uvicorn server.
+ * Server-side priority:
+ *   1. `next/headers` host (echoes the incoming request's own domain — this
+ *      dodges Vercel Deployment Protection, which gates `VERCEL_URL` but
+ *      leaves the canonical/prod URL public).
+ *   2. `VERCEL_PROJECT_PRODUCTION_URL` — canonical prod URL on Vercel.
+ *   3. `VERCEL_URL` — per-deployment URL (only unprotected in production).
+ *   4. `NEXT_PUBLIC_API_URL` — local dev override (points at uvicorn).
+ *   5. `http://localhost:PORT` — last-resort local fallback.
+ *
+ * Client-side: same-origin unless `NEXT_PUBLIC_API_URL` was baked in at
+ * build time (local dev only — do NOT set this on Vercel).
  */
-function resolveBaseUrl(): string {
+async function resolveBaseUrl(): Promise<string> {
   if (typeof window === "undefined") {
+    try {
+      // Dynamic import so the client bundle doesn't pull in `next/headers`.
+      const { headers } = await import("next/headers");
+      const h = await headers();
+      const host = h.get("host");
+      if (host) {
+        const proto = h.get("x-forwarded-proto")
+          ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
+        return `${proto}://${host}`;
+      }
+    } catch {
+      // `next/headers` is only available inside a request scope; fall through.
+    }
+    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+      return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    }
     if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
     if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
     return `http://localhost:${process.env.PORT ?? 3000}`;
@@ -32,7 +51,8 @@ async function request<T>(
   path: string,
   init?: RequestInit & { next?: { revalidate?: number } },
 ): Promise<T> {
-  const res = await fetch(`${resolveBaseUrl()}${API_PREFIX}${path}`, {
+  const base = await resolveBaseUrl();
+  const res = await fetch(`${base}${API_PREFIX}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
