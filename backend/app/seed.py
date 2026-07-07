@@ -1,9 +1,9 @@
-"""Seed the SQLite database with sample users, meetings, and participants.
+"""Seed the database with sample users, meetings, and participants.
 
-- CLI (`python -m api.seed`)    → drops the DB file and re-seeds from scratch.
-- `seed_if_empty()`             → invoked on Vercel cold starts. Only seeds
-                                  when there are zero users, so it's a no-op
-                                  on warm instances.
+- CLI (`python -m app.seed` or `python seed.py`) → drops and re-seeds.
+- `seed_if_empty()` → called on FastAPI startup. Only inserts sample
+  rows when the `user` table is empty, so redeploys don't clobber
+  real data.
 """
 
 from datetime import timedelta
@@ -86,8 +86,6 @@ def _populate(session: Session) -> None:
 
 
 def reset_and_seed() -> None:
-    # Wipe the on-disk SQLite file if we're using local storage; for Turso
-    # we can't unlink a remote DB, so fall back to truncating all rows below.
     if DB_PATH is not None and DB_PATH.exists():
         DB_PATH.unlink()
     init_db()

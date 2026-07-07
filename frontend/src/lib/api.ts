@@ -1,58 +1,19 @@
 import type { Meeting, Participant, User } from "./types";
 
-// The FastAPI app registers all routes under `/api`; the frontend call
-// sites still use unprefixed paths for readability, so we prepend the
-// prefix here.
+// The FastAPI backend is a separate service (Railway in prod, uvicorn
+// locally) and mounts every route under `/api`. `NEXT_PUBLIC_API_URL`
+// is the origin of that service — set it in Vercel env vars for prod
+// and in `.env.local` (default: http://127.0.0.1:8000) for dev.
+export const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 const API_PREFIX = "/api";
-
-/**
- * Resolve the base URL for API calls.
- *
- * Server-side priority:
- *   1. `next/headers` host (echoes the incoming request's own domain — this
- *      dodges Vercel Deployment Protection, which gates `VERCEL_URL` but
- *      leaves the canonical/prod URL public).
- *   2. `VERCEL_PROJECT_PRODUCTION_URL` — canonical prod URL on Vercel.
- *   3. `VERCEL_URL` — per-deployment URL (only unprotected in production).
- *   4. `NEXT_PUBLIC_API_URL` — local dev override (points at uvicorn).
- *   5. `http://localhost:PORT` — last-resort local fallback.
- *
- * Client-side: same-origin unless `NEXT_PUBLIC_API_URL` was baked in at
- * build time (local dev only — do NOT set this on Vercel).
- */
-async function resolveBaseUrl(): Promise<string> {
-  if (typeof window === "undefined") {
-    try {
-      // Dynamic import so the client bundle doesn't pull in `next/headers`.
-      const { headers } = await import("next/headers");
-      const h = await headers();
-      const host = h.get("host");
-      if (host) {
-        const proto = h.get("x-forwarded-proto")
-          ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
-        return `${proto}://${host}`;
-      }
-    } catch {
-      // `next/headers` is only available inside a request scope; fall through.
-    }
-    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-      return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-    }
-    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-    return `http://localhost:${process.env.PORT ?? 3000}`;
-  }
-  return process.env.NEXT_PUBLIC_API_URL ?? "";
-}
-
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 async function request<T>(
   path: string,
   init?: RequestInit & { next?: { revalidate?: number } },
 ): Promise<T> {
-  const base = await resolveBaseUrl();
-  const res = await fetch(`${base}${API_PREFIX}${path}`, {
+  const res = await fetch(`${API_URL}${API_PREFIX}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",

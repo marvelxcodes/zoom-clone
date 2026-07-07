@@ -2,14 +2,15 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 
-from .database import get_session, init_db
+from .database import get_session
 from .routers import meetings, participants
 from .routers.meetings import _default_user
 from .schemas import UserOut
+from .seed import seed_if_empty
 
-# The frontend calls every endpoint under `/api/*` (same-origin on Vercel,
-# absolute URL locally). Keep this legacy backend in sync with the Vercel
-# entrypoint at `frontend/api/index.py`.
+# Frontend calls every endpoint under `/api/*`. This is a standalone
+# FastAPI service — deployed to Railway, called cross-origin by the
+# Next.js frontend on Vercel.
 API_PREFIX = "/api"
 
 app = FastAPI(title="Zoom Clone API", version="0.1.0")
@@ -25,7 +26,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup() -> None:
-    init_db()
+    # Idempotent: creates tables and only inserts sample rows when the DB
+    # is empty. Safe to run on every process start.
+    seed_if_empty()
 
 
 @app.get(f"{API_PREFIX}", tags=["health"])
