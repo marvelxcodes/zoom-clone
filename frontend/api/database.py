@@ -45,7 +45,10 @@ def _turso_engine_args() -> Optional[tuple[str, dict]]:
     if not url.endswith("/"):
         url += "/"
 
-    connect_args: dict = {"secure": True}
+    # libsql-experimental's `connect()` only accepts `auth_token` / `sync_url`
+    # / `encryption_key`. `secure=True` is implied by the `libsql://` scheme,
+    # so don't pass it as a kwarg — the driver raises TypeError.
+    connect_args: dict = {}
     if token:
         connect_args["auth_token"] = token
     return url, connect_args
