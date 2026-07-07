@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: zoom-clone-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api
+    envVars:
+      - key: TURSO_DATABASE_URL
+        sync: false        # set in Render dashboard — libsql://<db>-<org>.turso.io
+      - key: TURSO_AUTH_TOKEN
+        sync: false        # set in Render dashboard — Turso JWT
+      - key: FRONTEND_URL
+        sync: false        # e.g. https://zoom-clone-gilt-five.vercel.app
+      - key: PYTHON_VERSION
+        value: "3.12"

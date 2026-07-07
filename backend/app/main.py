@@ -9,7 +9,7 @@ from .schemas import UserOut
 from .seed import seed_if_empty
 
 # Frontend calls every endpoint under `/api/*`. This is a standalone
-# FastAPI service — deployed to Railway, called cross-origin by the
+# FastAPI service — deployed to Render, called cross-origin by the
 # Next.js frontend on Vercel.
 API_PREFIX = "/api"
 

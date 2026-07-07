@@ -2,7 +2,7 @@
 
 A functional Zoom web app clone with a Next.js (App Router) frontend and a Python FastAPI + libSQL backend. Users can start instant meetings, join by ID, schedule meetings, and participate in a meeting room with host controls (mute all, remove participant) — without any real video streaming.
 
-Deployed as **two services**: the Next.js frontend on **Vercel** and the FastAPI backend on **Railway**, with the browser calling the Railway URL cross-origin.
+Deployed as **two services**: the Next.js frontend on **Vercel** and the FastAPI backend on **Render**, with the browser calling the Render URL cross-origin.
 
 ## Tech stack
 
@@ -12,7 +12,7 @@ Deployed as **two services**: the Next.js frontend on **Vercel** and the FastAPI
 | Backend   | Python 3.11+, FastAPI, SQLModel (SQLAlchemy), Pydantic v2, uvicorn                                        |
 | Database  | [Turso](https://turso.tech/) (libSQL) in production; local SQLite file for dev                            |
 | Tooling   | Bun package manager, Biome (lint/format)                                                                  |
-| Hosting   | Vercel (frontend) + Railway (backend)                                                                     |
+| Hosting   | Vercel (frontend) + Render (backend)                                                                      |
 
 ## Project layout
 
@@ -20,6 +20,7 @@ Deployed as **two services**: the Next.js frontend on **Vercel** and the FastAPI
 zoom-clone/
 ├── AGENTS.md
 ├── README.md
+├── render.yaml                 # Render blueprint (backend service)
 ├── frontend/                   # → deployed to Vercel (Root Directory = frontend)
 │   ├── src/
 │   │   ├── app/                # /wc/home, /wc/join, /wc/[meetingId]/start, /meeting/schedule
@@ -29,7 +30,7 @@ zoom-clone/
 │   ├── package.json
 │   ├── next.config.ts
 │   └── .env.local              # NEXT_PUBLIC_API_URL=http://127.0.0.1:8000 (dev)
-└── backend/                    # → deployed to Railway (Root Directory = backend)
+└── backend/                    # → deployed to Render (Root Directory = backend)
     ├── app/
     │   ├── main.py             # ASGI FastAPI app, all routes under /api
     │   ├── database.py         # SQLite engine → Turso when env vars set
@@ -38,21 +39,21 @@ zoom-clone/
     │   ├── utils.py            # ID / invite URL helpers
     │   ├── seed.py             # `python -m app.seed` + startup seeder
     │   └── routers/{meetings,participants}.py
-    ├── Procfile                # Railway start command
     ├── requirements.txt
     └── seed.py                 # CLI shim → app.seed:reset_and_seed
 ```
 
 ## Deploying
 
-### Backend → Railway
+### Backend → Render
+
+The repo ships a `render.yaml` blueprint that fully describes the backend service. Two ways to deploy:
+
+**A. Blueprint (recommended)**
 
 1. Push the repo to GitHub.
-2. In Railway, create a new project → **Deploy from GitHub repo**.
-3. Open the service's **Settings** and set:
-   - **Root Directory**: `backend`
-   - **Start Command**: (leave blank; the `Procfile` runs `uvicorn app.main:app --host 0.0.0.0 --port $PORT`)
-4. Under **Variables**, add:
+2. In Render, hit **New → Blueprint** and point it at the repo. Render reads `render.yaml`, creates a web service named `zoom-clone-backend`, sets its root directory to `backend`, and configures the build + start commands.
+3. On the create screen, Render prompts for the three secret env vars (they're `sync: false` in the blueprint). Provide:
 
    | Name                 | Value                                                                 |
    | -------------------- | --------------------------------------------------------------------- |
@@ -60,9 +61,22 @@ zoom-clone/
    | `TURSO_AUTH_TOKEN`   | Turso token                                                           |
    | `FRONTEND_URL`       | Vercel URL, e.g. `https://zoom-clone-gilt-five.vercel.app` — used to build invite/join links returned by the API |
 
-5. Open the service → **Settings → Networking → Generate Domain**. Railway hands you a `*.up.railway.app` URL. Copy it — that's `NEXT_PUBLIC_API_URL` for the frontend.
+4. Hit **Apply**. Render provisions the service and hands you an `https://zoom-clone-backend.onrender.com` URL — copy it, that's `NEXT_PUBLIC_API_URL` for the frontend.
 
-Railway auto-detects Python from `requirements.txt` (via nixpacks) and installs deps on every deploy. The FastAPI startup hook runs `seed_if_empty()`, which populates Turso only when the `user` table is empty.
+**B. Manual**
+
+If you'd rather set it up by hand: **New → Web Service** → pick the GitHub repo → set:
+- **Root Directory**: `backend`
+- **Runtime**: Python
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Health Check Path**: `/api`
+
+Then add the three env vars above.
+
+Render auto-installs deps from `backend/requirements.txt` on every deploy. The FastAPI startup hook runs `seed_if_empty()`, which populates Turso only when the `user` table is empty.
+
+> **Free-tier note**: Render's free plan spins the service down after ~15 min of inactivity; the first request after a sleep takes 30-60 s while the container cold-boots. Upgrade the `plan:` in `render.yaml` (or via the dashboard) if you need it always-on.
 
 ### Frontend → Vercel
 
@@ -72,9 +86,9 @@ Railway auto-detects Python from `requirements.txt` (via nixpacks) and installs 
 
    | Name                   | Value                                              |
    | ---------------------- | -------------------------------------------------- |
-   | `NEXT_PUBLIC_API_URL`  | The Railway domain from the step above, e.g. `https://zoom-clone-production.up.railway.app` |
+   | `NEXT_PUBLIC_API_URL`  | The Render domain from the step above, e.g. `https://zoom-clone-backend.onrender.com` |
 
-4. Deploy. Server components fetch the API directly from Railway (absolute URL, so Node's `fetch` is happy); the browser hits the same URL client-side.
+4. Deploy. Server components fetch the API directly from Render (absolute URL, so Node's `fetch` is happy); the browser hits the same URL client-side.
 
 CORS on the backend is already `allow_origins=["*"]`, so no additional config is needed.
 
@@ -88,7 +102,7 @@ turso db show zoom-clone --url            # → libsql://<db>-<org>.turso.io
 turso db tokens create zoom-clone         # → eyJhbGci…
 ```
 
-Feed the URL and token into Railway (production) and — if you want your local uvicorn to hit the same DB — into `backend/.env` or your shell.
+Feed the URL and token into Render (production) and — if you want your local uvicorn to hit the same DB — into `backend/.env` or your shell.
 
 To reset and re-seed a Turso database:
 

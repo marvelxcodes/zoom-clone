@@ -1,6 +1,6 @@
 import type { Meeting, Participant, User } from "./types";
 
-// The FastAPI backend is a separate service (Railway in prod, uvicorn
+// The FastAPI backend is a separate service (Render in prod, uvicorn
 // locally) and mounts every route under `/api`. `NEXT_PUBLIC_API_URL`
 // is the origin of that service — set it in Vercel env vars for prod
 // and in `.env.local` (default: http://127.0.0.1:8000) for dev.
